@@ -68,6 +68,13 @@ async def get_repository(repository_id: str, session: AsyncSession = Depends(get
     repository = await session.get(Repository, repository_id)
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
+
+    restored = await analysis_service.ensure_repository_workspace(session, repository, fail_hard=False)
+    if restored:
+        await session.commit()
+    else:
+        repository.current_step = "本地源码缓存缺失，可重新分析或稍后重试"
+
     return serialize_repository(repository)
 
 
@@ -107,6 +114,12 @@ async def chat_with_repository(
     repository = await session.get(Repository, repository_id)
     if repository is None:
         raise HTTPException(status_code=404, detail="Repository not found")
+
+    restored = await analysis_service.ensure_repository_workspace(session, repository, fail_hard=False)
+    if not restored:
+        raise HTTPException(status_code=503, detail="Local repository cache is missing and automatic restore failed")
+
+    await session.commit()
     stream = await ask_repository(session, repository, payload.question)
     return StreamingResponse(stream, media_type="text/plain; charset=utf-8")
 

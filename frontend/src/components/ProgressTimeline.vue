@@ -38,7 +38,10 @@ defineProps({
           <div class="timeline-detail">{{ event.detail || "处理中" }}</div>
         </div>
       </div>
-      <div v-if="events.length === 0" class="empty-tip">提交仓库后，这里会实时推送分析阶段。</div>
+
+      <div v-if="events.length === 0" class="empty-tip">
+        提交仓库后，这里会实时推送分析阶段。
+      </div>
     </div>
   </section>
 </template>

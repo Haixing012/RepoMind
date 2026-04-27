@@ -54,6 +54,7 @@ const repoMeta = computed(() => {
               <h2>最近分析</h2>
             </div>
           </div>
+
           <button
             v-for="item in store.recentRepos"
             :key="item.id"
@@ -63,7 +64,10 @@ const repoMeta = computed(() => {
             <strong>{{ item.repo_name }}</strong>
             <span>{{ item.latest_summary || item.normalized_url }}</span>
           </button>
-          <div v-if="store.recentRepos.length === 0" class="empty-tip">这里会缓存已经分析过的仓库。</div>
+
+          <div v-if="store.recentRepos.length === 0" class="empty-tip">
+            这里会缓存已经分析过的仓库。
+          </div>
         </section>
       </div>
 
@@ -75,6 +79,7 @@ const repoMeta = computed(() => {
               <h2>{{ store.currentRepo?.repo_name || "等待项目" }}</h2>
             </div>
           </div>
+
           <div class="meta-grid">
             <div v-for="item in repoMeta" :key="item.label" class="meta-card">
               <component :is="item.icon" :size="18" />

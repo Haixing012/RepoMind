@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.repository import AnalysisJob, Repository
-from app.services.git_service import clone_or_update_repo
+from app.services.git_service import clone_or_update_repo, normalize_github_url
 from app.services.progress import progress_broker
 from app.services.report_service import generate_file_summaries, generate_report, normalize_markdown_report
 from app.services.repository_intelligence import collect_snapshot
@@ -41,8 +42,6 @@ class AnalysisService:
         await progress_broker.publish(repository.id, payload)
 
     async def ensure_repository(self, session: AsyncSession, repo_url: str, force_refresh: bool = False) -> Repository:
-        from app.services.git_service import normalize_github_url
-
         normalized_url = normalize_github_url(repo_url)
         repository = await session.scalar(select(Repository).where(Repository.normalized_url == normalized_url))
         repo_path, default_branch, commit_hash = await asyncio.to_thread(clone_or_update_repo, repo_url, force_refresh)
@@ -63,6 +62,39 @@ class AnalysisService:
         await session.flush()
         return repository
 
+    async def ensure_repository_workspace(
+        self,
+        session: AsyncSession,
+        repository: Repository,
+        *,
+        force_refresh: bool = False,
+        fail_hard: bool = True,
+    ) -> bool:
+        local_path = Path(repository.local_path) if repository.local_path else None
+        workspace_missing = not local_path or not local_path.exists()
+
+        if not workspace_missing and not force_refresh:
+            return True
+
+        repo_url = repository.repo_url or repository.normalized_url
+        try:
+            repo_path, default_branch, commit_hash = await asyncio.to_thread(
+                clone_or_update_repo,
+                repo_url,
+                force_refresh,
+            )
+        except Exception:
+            if fail_hard:
+                raise
+            return False
+
+        repository.local_path = str(repo_path)
+        repository.default_branch = default_branch
+        repository.last_commit = commit_hash
+        repository.repo_name = repository.repo_name or repository.normalized_url.rsplit("/", maxsplit=1)[-1]
+        await session.flush()
+        return True
+
     async def queue_analysis(self, repository_id: str) -> None:
         asyncio.create_task(self.run_analysis(repository_id))
 
@@ -78,6 +110,7 @@ class AnalysisService:
             await session.commit()
 
             try:
+                await self.ensure_repository_workspace(session, repository, fail_hard=True)
                 snapshot = await asyncio.to_thread(collect_snapshot, repository_path(repository))
                 await self._emit(repository, status="running", progress=0.25, step="扫描目录", detail="已提取目录树和技术栈")
                 repository.tech_stack_json = json.dumps(snapshot.tech_stack, ensure_ascii=False)
@@ -129,7 +162,5 @@ class AnalysisService:
                 raise
 
 
-def repository_path(repository: Repository):
-    from pathlib import Path
-
+def repository_path(repository: Repository) -> Path:
     return Path(repository.local_path)

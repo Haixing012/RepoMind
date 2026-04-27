@@ -22,7 +22,7 @@ class RepositoryIntelligenceTests(unittest.TestCase):
 
     def test_search_code(self):
         hits = search_code(self.project_root / "backend", "normalize_github_url")
-        self.assertTrue(any(hit["path"].endswith("tests/test_repository_intelligence.py") for hit in hits))
+        self.assertTrue(any(hit["path"] == "app/services/git_service.py" for hit in hits))
 
 
 if __name__ == "__main__":
