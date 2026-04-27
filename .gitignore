@@ -1,0 +1,16 @@
+.firecrawl/
+.pytest_cache/
+__pycache__/
+.mypy_cache/
+.DS_Store
+backend/.venv/
+backend/.env
+backend/storage/
+backend/backend/
+backend/pytest-cache-files-*/
+backend/tmp_pytest/
+backend/tests/_tmp/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
